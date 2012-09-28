@@ -1,0 +1,11 @@
+.deps
+.libs/
+Makefile
+Makefile.fragments
+Makefile.objects
+config.log
+config.status
+libtool
+modules/
+uuid.la
+uuid.lo
