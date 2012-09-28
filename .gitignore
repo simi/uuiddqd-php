@@ -9,3 +9,4 @@ libtool
 modules/
 uuid.la
 uuid.lo
+autom4te.cache/

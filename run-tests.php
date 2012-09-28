@@ -24,7 +24,7 @@
    +----------------------------------------------------------------------+
  */
 
-/* $Id: cfc562ebc15dedd268fa9aade4cc3e4350da4d42 $ */
+/* $Id$ */
 
 /* Sanity check to ensure that pcre extension needed by this script is available.
  * In the event it is not, print a nice error message indicating that this script will
@@ -311,6 +311,7 @@ VALGRIND    : " . ($leak_check ? $valgrind_header : 'Not used') . "
 define('PHP_QA_EMAIL', 'qa-reports@lists.php.net');
 define('QA_SUBMISSION_PAGE', 'http://qa.php.net/buildtest-process.php');
 define('QA_REPORTS_PAGE', 'http://qa.php.net/reports');
+define('TRAVIS_CI' , (bool) getenv('TRAVIS'));
 
 function save_or_mail_results()
 {
@@ -318,7 +319,7 @@ function save_or_mail_results()
 		   $PHP_FAILED_TESTS, $CUR_DIR, $php, $output_file, $compression;
 
 	/* We got failed Tests, offer the user to send an e-mail to QA team, unless NO_INTERACTION is set */
-	if (!getenv('NO_INTERACTION')) {
+	if (!getenv('NO_INTERACTION') && !TRAVIS_CI) {
 		$fp = fopen("php://stdin", "r+");
 		if ($sum_results['FAILED'] || $sum_results['BORKED'] || $sum_results['WARNED'] || $sum_results['LEAKED'] || $sum_results['XFAILED']) {
 			echo "\nYou may have found a problem in PHP.";
@@ -335,8 +336,8 @@ function save_or_mail_results()
 		$just_save_results = (strtolower($user_input[0]) == 's');
 	}
 
-	if ($just_save_results || !getenv('NO_INTERACTION')) {
-		if ($just_save_results || strlen(trim($user_input)) == 0 || strtolower($user_input[0]) == 'y') {
+	if ($just_save_results || !getenv('NO_INTERACTION') || TRAVIS_CI) {
+		if ($just_save_results || TRAVIS_CI || strlen(trim($user_input)) == 0 || strtolower($user_input[0]) == 'y') {
 			/*
 			 * Collect information about the host system for our report
 			 * Fetch phpinfo() output so that we can see the PHP enviroment
@@ -348,7 +349,9 @@ function save_or_mail_results()
 			}
 
 			/* Ask the user to provide an email address, so that QA team can contact the user */
-			if (!strncasecmp($user_input, 'y', 1) || strlen(trim($user_input)) == 0) {
+			if (TRAVIS_CI) {
+				$user_email = 'travis at php dot net';
+			} elseif (!strncasecmp($user_input, 'y', 1) || strlen(trim($user_input)) == 0) {
 				echo "\nPlease enter your email address.\n(Your address will be mangled so that it will not go out on any\nmailinglist in plain text): ";
 				flush();
 				$user_email = trim(fgets($fp, 1024));
@@ -423,19 +426,6 @@ function save_or_mail_results()
 
 			$failed_tests_data .= $sep . "PHPINFO" . $sep;
 			$failed_tests_data .= shell_exec($php . ' -ddisplay_errors=stderr -dhtml_errors=0 -i 2> /dev/null');
-
-			if ($just_save_results || !mail_qa_team($failed_tests_data, $compression, $status)) {
-				file_put_contents($output_file, $failed_tests_data);
-
-				if (!$just_save_results) {
-					echo "\nThe test script was unable to automatically send the report to PHP's QA Team\n";
-				}
-
-				echo "Please send " . $output_file . " to " . PHP_QA_EMAIL . " manually, thank you.\n";
-			} else {
-				fwrite($fp, "\nThank you for helping to make PHP better.\n");
-				fclose($fp);
-			}
 		}
 	}
 }
@@ -645,7 +635,7 @@ if (isset($argc) && $argc > 1) {
 					$html_output = is_resource($html_file);
 					break;
 				case '--version':
-					echo '$Id: cfc562ebc15dedd268fa9aade4cc3e4350da4d42 $' . "\n";
+					echo '$Id$' . "\n";
 					exit(1);
 
 				default:
@@ -813,7 +803,7 @@ HELP;
 
 		junit_save_xml();
 
-		if (getenv('REPORT_EXIT_STATUS') == 1 and preg_match('/FAILED(?: |$)/', implode(' ', $test_results))) {
+		if (preg_match('/FAIL(?: |$)/', implode(' ', $test_results))) {
 			exit(1);
 		}
 
@@ -958,47 +948,6 @@ exit(0);
 // Send Email to QA Team
 //
 
-function mail_qa_team($data, $compression, $status = false)
-{
-	$url_bits = parse_url(QA_SUBMISSION_PAGE);
-
-	if (($proxy = getenv('http_proxy'))) {
-		$proxy = parse_url($proxy);
-		$path = $url_bits['host'].$url_bits['path'];
-		$host = $proxy['host'];
-		if (empty($proxy['port'])) {
-			$proxy['port'] = 80;
-		}
-		$port = $proxy['port'];
-	} else {
-		$path = $url_bits['path'];
-		$host = $url_bits['host'];
-		$port = empty($url_bits['port']) ? 80 : $port = $url_bits['port'];
-	}
-
-	$data = "php_test_data=" . urlencode(base64_encode(str_replace("\00", '[0x0]', $data)));
-	$data_length = strlen($data);
-
-	$fs = fsockopen($host, $port, $errno, $errstr, 10);
-
-	if (!$fs) {
-		return false;
-	}
-
-	$php_version = urlencode(TESTED_PHP_VERSION);
-
-	echo "\nPosting to ". QA_SUBMISSION_PAGE . "\n";
-	fwrite($fs, "POST " . $path . "?status=$status&version=$php_version HTTP/1.1\r\n");
-	fwrite($fs, "Host: " . $host . "\r\n");
-	fwrite($fs, "User-Agent: QA Browser 0.1\r\n");
-	fwrite($fs, "Content-Type: application/x-www-form-urlencoded\r\n");
-	fwrite($fs, "Content-Length: " . $data_length . "\r\n\r\n");
-	fwrite($fs, $data);
-	fwrite($fs, "\r\n\r\n");
-	fclose($fs);
-
-	return 1;
-}
 
 
 //

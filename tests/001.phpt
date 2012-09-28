@@ -1,7 +1,5 @@
 --TEST--
 Check for uuid length and randomness
---SKIPIF--
-<?php if (!extension_loaded("uuid")) print "skip"; ?>
 --FILE--
 <?php 
   $uuid = generate_uuid();
