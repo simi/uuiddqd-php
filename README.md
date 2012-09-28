@@ -1,4 +1,4 @@
-# Uuiddqd-php
+# Uuiddqd-php [![Build Status](https://secure.travis-ci.org/simi/uuiddqd-php.png)](http://travis-ci.org/simi/uuiddqd-php)
 
 Simple libuuid php c binding
 
